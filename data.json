@@ -1,6 +1,6 @@
 {
-    "max_water_capacity":300
-    ,
+    "max_water_capacity":300,
+    "max_time":2,
     "tick_line": [
         {
             "tick_number":0,
@@ -10,7 +10,7 @@
                     "x":500,
                     "y":300,
                     "desired_x":700,
-                    "desired_y":300,
+                    "desired_y":220,
                     "inventory":50
                 }
             ],
@@ -43,8 +43,45 @@
                 {
                     "id":0,
                     "x":700,
-                    "y":300,
+                    "y":220,
+                    "desired_x":600,
+                    "desired_y":150,
                     "inventory":100
+                }
+            ],
+            "cells": [
+                {
+                    "x":150,
+                    "y":150,
+                    "water":200
+                },
+                {
+                    "x":800,
+                    "y":550,
+                    "water":100
+                },
+                {
+                    "x":350,
+                    "y":550,
+                    "water":300
+                },
+                {
+                    "x":500,
+                    "y":30,
+                    "water":20
+                }
+            ]
+        },
+        {
+            "tick_number":2,
+            "agents": [
+                {
+                    "id":0,
+                    "x":600,
+                    "y":150,
+                    "desired_x":500,
+                    "desired_y":300,
+                    "inventory":50
                 }
             ],
             "cells": [

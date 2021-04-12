@@ -22,6 +22,14 @@ def colorPercentage(n):
 def pit_radius(water_percentage):
     return PIT_MAX_RADIUS * water_percentage
 
+def clamp_norm(v, n_max):
+    vx = v[0]
+    vy = v[1]
+    n = math.sqrt(vx**2 + vy**2)
+    if n == 0:
+        return 0
+    f = min(n, n_max) / n
+    return np.array([f * vx, f * vy])
 
 #drawing on the screen : we draw each cells and each agent
 def draw_window(state):
@@ -34,45 +42,43 @@ def draw_window(state):
 
 #drawing the cells : we are drawing the water resources on the map
 def drawCell(cell, max_water_capacity):
-        x = cell.x
-        y = cell.y
         #drawing a water pit, its radius depends on the number of left water
-        pygame.draw.circle(SCREEN, (0, 0, 255), (x, y), pit_radius(cell.water / max_water_capacity))
+        pygame.draw.circle(SCREEN, (0, 0, 255), cell.pos, pit_radius(cell.water / max_water_capacity))
 
 #drawing the agents : 
 def drawAgent(agent):
-    center = (agent.x, agent.y)
     #an agent will be represented as a circle on the screen
-    pygame.draw.circle(SCREEN, (127, 127, 0), center, 4)
+    pygame.draw.circle(SCREEN, (127, 127, 0), agent.pos, 4)
 
 #updating the states will be done with the logs from the simulation.
 # For visualisation we will for now simulate a very simple behaviour...
 def updateAgent(state):
     for agent in state.agents:
         #verify that agent can still move in its current direction : he does not hit a border
-        if agent.x + agent.vx > WIDTH or agent.x + agent.vx < 0:
+        #if (agent.pos + agent.vel).any() > np.array([WIDTH, HEIGHT]).any() or (agent.pos + agent.vel).any() < np.array([0, 0]).any():
             #if so, the agent goes in opposit direction (as I said it's very simple only to visualise...)
-            agent.vx = -agent.vx
-        #same thing for y direction
-        if agent.y + agent.vy > HEIGHT or agent.y + agent.vy < 0:
-            agent.vy = -agent.vy
+            #agent.vel = -agent.vel
         #we now must verify that the agent does not hit a water pit
-        for cell in state.cells:
+        #for cell in state.cells:
             #computing the distance between water pit's center and agent's center
-            dist = math.hypot(agent.x-cell.x, agent.y-cell.y)
+            #dist = math.hypot(agent.pos[0]-cell.pos[0], agent.pos[1]-cell.pos[1])
             #if the distance is lower than the radius, then again change the direction
-            if dist < pit_radius(cell.water / state.max_water_capacity):
-                agent.vx = -agent.vx
-                agent.vy = -agent.vy
+            #if dist < pit_radius(cell.water / state.max_water_capacity):
+                #agent.vel[0] = -agent.vel[0]
+                #agent.vel[1] = -agent.vel[1]
         #finally update the new positions
-        desiredDirection = 
-        agent.x += agent.vx
-        agent.y += agent.vy
+        temp = agent.desired_pos - agent.pos
+        desiredDirection = temp / np.linalg.norm(temp)
+
+        desiredVelocity = desiredDirection * AGENT_MAX_SPEED
+        desiredSteeringForce = (desiredVelocity - agent.vel) * AGENT_STEER_STRENGTH
+        acceleration = clamp_norm(desiredSteeringForce, AGENT_STEER_STRENGTH) / 1
+
+        agent.vel = clamp_norm(agent.vel + acceleration, AGENT_MAX_SPEED) / 1
+        agent.pos = agent.pos + agent.vel
 
 def main():
 
-
-    time = 0
     state = State("/Users/tancrede/Desktop/projects/survival_simulation/data.json")
 
     clock = pygame.time.Clock()
@@ -83,7 +89,13 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-        #state.load(time)
+        nexttime = True
+        for agent in state.agents:
+            if not (np.isclose(agent.desired_pos, agent.pos, rtol=1e-05, atol=1).all()):
+                nexttime = False
+        if nexttime:
+            state.load()
+
         draw_window(state)
         updateAgent(state)
         SCREEN.fill(BLACK)
