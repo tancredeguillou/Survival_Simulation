@@ -91,7 +91,7 @@ def main():
 
         nexttime = True
         for agent in state.agents:
-            if not (np.isclose(agent.desired_pos, agent.pos, rtol=1e-05, atol=1).all()):
+            if not (np.isclose(agent.desired_pos, agent.pos, rtol=1e-05, atol=2).all()):
                 nexttime = False
         if nexttime:
             state.load()
