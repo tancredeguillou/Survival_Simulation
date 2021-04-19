@@ -20,22 +20,25 @@ class Agent():
 
 class State():
 
-    def __init__(self, file):
-        #opening the json file
-        f = open(file)
+    def __init__(self, file, readable=True):
+        # readable is if we need to preprocess the json file since it is in a human readable format
+        # the correct format is exactly one line per json object
+        self.file = file # read only
+        self.readable = readable
 
-        #getting the dictionary
-        data = json.load(f)
+        self.data = self.read_file() # read only
+        self.x_size = self.data[0]['x_size']
+        self.y_size = self.data[0]['y_size']
+        self.max_water_capacity = self.data[0]['max_water_capacity_cell']
+        self.max_inventory = self.data[0]['max_water_capacity_agent']
 
-        self.file = file
-        self.max_water_capacity = data['max_water_capacity']
-        self.max_time = data['max_time']
+        self.time = 0 # read only
 
-        f.close()
-
+        # assuming there is one line for each [0, self.max_time]
+        self.max_time = len(self.data)-2
+        assert(self.data[-1]['tick_number'] == self.max_time)
         self.agents = []
-        self.time = 0
-        self.max_agent = 50
+        self.max_agent = 10
         self.load()
 
     def load(self):
@@ -44,18 +47,21 @@ class State():
         #temporary array as we want to keep track of the velocity
         newAgents = []
 
-        #opening the json file
-        f = open(self.file)
+        d = self.data[self.time+1]
+        assert(d['tick_number'] == self.time)
+        #agents on the next iteration, we want to know their position
+        nextTime = self.time+2
+        if self.time == self.max_time:
+            nextTime = 1
 
-        #getting the dictionary
-        data = json.load(f)
+        desired_pos_agents = self.data[nextTime]['agents']
 
-        for d in data['tick_line']:
-            if d['tick_number'] == self.time:
-                for agent in d['agents']:
-                    newAgents.append(Agent(agent['id'], agent['x'], agent['y'], agent['desired_x'], agent['desired_y'], agent['inventory']))
-                for cell in d['cells']:
-                    self.cells.append(Cell(cell['x'], cell['y'], cell['water']))
+        j = 0 
+        for agent in d['agents']:
+            newAgents.append(Agent(agent['id'], agent['x'], agent['y'], desired_pos_agents[j]['x'], desired_pos_agents[j]['y'], agent['inventory']))
+            j += 1
+        for cell in d['cells']:
+            self.cells.append(Cell(cell['x'], cell['y'], cell['water']))
         
         i = 0
         for agent in self.agents:
@@ -63,9 +69,25 @@ class State():
             i += 1
         self.agents = newAgents
 
-        f.close()
-
         if self.time == self.max_time:
             self.time = 0
         else:
             self.time += 1
+    
+    def read_file(self):
+        # takes self.file and returns a list of json objects from the file
+        with open(self.file) as f:
+            s = f.read()
+        if self.readable:
+            s = self.reformat_from_readable(s)
+        return [json.loads(line) for line in s.splitlines()]
+
+
+    def reformat_from_readable(self, s):
+        # human readable play not have exactly one line per json object
+        # This uses the observation that in json }{ cannot occur in a single object
+        # Note: so long as no string value containing } whitespace { appears in the json document
+        return ''.join(s.split()).replace('}{', '}\n{')
+
+    def count_survivors(self):
+        return sum(1 for agent in self.agents if agent.inventory > 0)

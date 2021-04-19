@@ -1,6 +1,8 @@
-import sys, pygame, math
+import sys, pygame, math, time
 import numpy as np
 from simulationState import State
+
+pygame.init()
 
 WIDTH = 900
 HEIGHT = 600
@@ -10,11 +12,15 @@ pygame.display.set_caption("Survival")
 
 FPS = 60
 BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 
 PIT_MAX_RADIUS = 50
 AGENT_MAX_SPEED = 2
 AGENT_STEER_STRENGTH = 2
 AGENTS_WANDER_STRENGTH = 0.5
+AGENT_RADIUS = 4
+
+font = pygame.font.SysFont("Times New Roman", 10)
 
 def colorPercentage(n):
     return 255 * (n / 100.0)
@@ -48,7 +54,7 @@ def drawCell(cell, max_water_capacity):
 #drawing the agents : 
 def drawAgent(agent):
     #an agent will be represented as a circle on the screen
-    pygame.draw.circle(SCREEN, (127, 127, 0), agent.pos, 4)
+    pygame.draw.circle(SCREEN, (127, 127, 0), agent.pos, AGENT_RADIUS)
 
 #updating the states will be done with the logs from the simulation.
 # For visualisation we will for now simulate a very simple behaviour...
@@ -77,28 +83,57 @@ def updateAgent(state):
         agent.vel = clamp_norm(agent.vel + acceleration, AGENT_MAX_SPEED) / 1
         agent.pos = agent.pos + agent.vel
 
+def message_to_screen(msg, x, y, color=BLACK):
+    screen_txt = font.render(msg, False, color)
+    SCREEN.blit(screen_txt, [x, y])
+
+def paused(state) :
+
+    paused = True
+
+    while paused:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    paused = False
+        pos = pygame.mouse.get_pos()
+        SCREEN.fill(BLACK)
+        for agent in state.agents:
+            #computing the distance between water pit's center and agent's center
+            dist = math.hypot(agent.pos[0]-pos[0], agent.pos[1]-pos[1])
+            #if the distance is lower than the radius, then again change the direction
+            if dist < AGENT_RADIUS:
+                message_to_screen("Agent id : ", agent.pos[0] + 2, agent.pos[1] - 10, WHITE)
+        draw_window(state)
+
 def main():
 
     state = State("/Users/tancrede/Desktop/projects/survival_simulation/data.json")
 
     clock = pygame.time.Clock()
+    iteration = 0
     run = True
     while run:
         clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    paused(state)
 
-        nexttime = True
-        for agent in state.agents:
-            if not (np.isclose(agent.desired_pos, agent.pos, rtol=1e-05, atol=2).all()):
-                nexttime = False
-        if nexttime:
+        if iteration == FPS:
             state.load()
+            iteration = 0
+        else:
+            iteration += 1
 
+        SCREEN.fill(BLACK)
         draw_window(state)
         updateAgent(state)
-        SCREEN.fill(BLACK)
+        
         
     pygame.quit()
 
