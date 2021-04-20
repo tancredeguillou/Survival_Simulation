@@ -1,17 +1,23 @@
 import json
 import numpy as np
 
+WIDTH = 900
+HEIGHT = 600
+
+def computePos(x, y, tw, th, twc, thc):
+    return np.array([(x * tw) + twc, (y * th) + thc])
+
 class Cell():
 
-    def __init__(self, x, y, water):
-        self.pos = np.array([x, y])
+    def __init__(self, pos, water):
+        self.pos = pos
         self.water = water
 
 class Agent():
 
-    def __init__(self, id, x, y, desired_x, desired_y, inventory):
-        self.pos = np.array([x, y])
-        self.desired_pos = np.array([desired_x, desired_y])
+    def __init__(self, id, pos, desired_pos, inventory):
+        self.pos = pos
+        self.desired_pos = desired_pos
         self.vel = np.array([0, 0])
         self.inventory = inventory
         #id seems to be artificial here
@@ -39,6 +45,11 @@ class State():
         assert(self.data[-1]['tick_number'] == self.max_time)
         self.agents = []
         self.max_agent = 10
+
+        self.tile_width = WIDTH / self.x_size
+        self.tile_height = HEIGHT / self.y_size
+        self.pit_max_radius = min(self.tile_width/2, self.tile_height/2)
+
         self.load()
 
     def load(self):
@@ -46,6 +57,9 @@ class State():
         self.cells = []
         #temporary array as we want to keep track of the velocity
         newAgents = []
+
+        twcenter = self.tile_width / 2
+        thcenter = self.tile_height / 2
 
         d = self.data[self.time+1]
         assert(d['tick_number'] == self.time)
@@ -58,15 +72,32 @@ class State():
 
         j = 0 
         for agent in d['agents']:
-            newAgents.append(Agent(agent['id'], agent['x'], agent['y'], desired_pos_agents[j]['x'], desired_pos_agents[j]['y'], agent['inventory']))
-            j += 1
+            desired_pos_x = -1
+            desired_pos_y = -1
+            if j<len(desired_pos_agents) and desired_pos_agents[j]['id']==agent['id']:
+                desired_pos_x = desired_pos_agents[j]['x']
+                desired_pos_y = desired_pos_agents[j]['y']
+                j += 1
+            pos = computePos(agent['x'], agent['y'], self.tile_width, self.tile_height, twcenter, thcenter)
+            if desired_pos_x == -1:
+                newAgents.append(Agent(agent['id'],
+                    pos,
+                    pos,
+                    agent['inventory']))
+            else:
+                newAgents.append(Agent(agent['id'],
+                    pos,
+                    computePos(desired_pos_x, desired_pos_y, self.tile_width, self.tile_height, twcenter, thcenter),
+                    agent['inventory']))
         for cell in d['cells']:
-            self.cells.append(Cell(cell['x'], cell['y'], cell['water']))
+            self.cells.append(Cell(computePos(cell['x'], cell['y'], self.tile_width, self.tile_height, twcenter, thcenter), cell['water']))
         
-        i = 0
-        for agent in self.agents:
-            newAgents[i].vel = agent.vel
-            i += 1
+        if self.agents != []:
+            i = 0
+            for newAgent in newAgents:
+                while newAgent.id != self.agents[i].id:
+                    i += 1
+                newAgent.vel = self.agents[i].vel
         self.agents = newAgents
 
         if self.time == self.max_time:

@@ -14,19 +14,18 @@ FPS = 60
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-PIT_MAX_RADIUS = 50
 AGENT_MAX_SPEED = 2
 AGENT_STEER_STRENGTH = 2
 AGENTS_WANDER_STRENGTH = 0.5
-AGENT_RADIUS = 4
+AGENT_RADIUS = 6
 
-font = pygame.font.SysFont("Times New Roman", 10)
+font = pygame.font.SysFont("Times New Roman", 13)
 
-def colorPercentage(n):
-    return 255 * (n / 100.0)
+def colorPercentage(n, scale):
+    return 255 * (n / scale)
 
-def pit_radius(water_percentage):
-    return PIT_MAX_RADIUS * water_percentage
+def pit_radius(pit_max_radius, water_percentage):
+    return pit_max_radius * water_percentage
 
 def clamp_norm(v, n_max):
     vx = v[0]
@@ -40,21 +39,23 @@ def clamp_norm(v, n_max):
 #drawing on the screen : we draw each cells and each agent
 def draw_window(state):
     for cell in state.cells:
-        drawCell(cell, state.max_water_capacity)
+        drawCell(cell, state.max_water_capacity, state.pit_max_radius)
     for agent in state.agents:
-        drawAgent(agent)
-    pygame.display.update()
+        drawAgent(agent, state.max_inventory)
 
 
 #drawing the cells : we are drawing the water resources on the map
-def drawCell(cell, max_water_capacity):
+def drawCell(cell, max_water_capacity, pit_max_radius):
         #drawing a water pit, its radius depends on the number of left water
-        pygame.draw.circle(SCREEN, (0, 0, 255), cell.pos, pit_radius(cell.water / max_water_capacity))
+        pygame.draw.circle(SCREEN, (0, 0, 255), cell.pos, pit_radius(pit_max_radius, cell.water / max_water_capacity))
 
 #drawing the agents : 
-def drawAgent(agent):
+def drawAgent(agent, max_inventory):
     #an agent will be represented as a circle on the screen
-    pygame.draw.circle(SCREEN, (127, 127, 0), agent.pos, AGENT_RADIUS)
+    #pygame.draw.circle(SCREEN, (127, 127, 0), agent.pos, AGENT_RADIUS)
+    pygame.draw.circle(SCREEN,
+        (colorPercentage(max_inventory - agent.inventory, max_inventory), colorPercentage(agent.inventory, max_inventory), 0),
+        agent.pos, AGENT_RADIUS)
 
 #updating the states will be done with the logs from the simulation.
 # For visualisation we will for now simulate a very simple behaviour...
@@ -83,7 +84,7 @@ def updateAgent(state):
         agent.vel = clamp_norm(agent.vel + acceleration, AGENT_MAX_SPEED) / 1
         agent.pos = agent.pos + agent.vel
 
-def message_to_screen(msg, x, y, color=BLACK):
+def message_to_screen(msg, x, y, color=WHITE):
     screen_txt = font.render(msg, False, color)
     SCREEN.blit(screen_txt, [x, y])
 
@@ -100,17 +101,20 @@ def paused(state) :
                     paused = False
         pos = pygame.mouse.get_pos()
         SCREEN.fill(BLACK)
+        draw_window(state)
         for agent in state.agents:
             #computing the distance between water pit's center and agent's center
             dist = math.hypot(agent.pos[0]-pos[0], agent.pos[1]-pos[1])
             #if the distance is lower than the radius, then again change the direction
             if dist < AGENT_RADIUS:
-                message_to_screen("Agent id : ", agent.pos[0] + 2, agent.pos[1] - 10, WHITE)
-        draw_window(state)
+                message_to_screen("Agent id : " + str(agent.id), agent.pos[0] + 10, agent.pos[1] - 30)
+                message_to_screen("Water left : " + str(agent.inventory), agent.pos[0] + 10, agent.pos[1] - 15)
+        pygame.display.update()
+        
 
 def main():
 
-    state = State("/Users/tancrede/Desktop/projects/survival_simulation/data.json")
+    state = State("/Users/tancrede/Desktop/projects/survival_simulation/test.json")
 
     clock = pygame.time.Clock()
     iteration = 0
@@ -124,7 +128,7 @@ def main():
                 if event.key == pygame.K_SPACE:
                     paused(state)
 
-        if iteration == FPS:
+        if iteration == 2:
             state.load()
             iteration = 0
         else:
@@ -132,7 +136,8 @@ def main():
 
         SCREEN.fill(BLACK)
         draw_window(state)
-        updateAgent(state)
+        pygame.display.update()
+        #updateAgent(state)
         
         
     pygame.quit()
