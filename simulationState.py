@@ -5,6 +5,8 @@ WIDTH = 900
 HEIGHT = 600
 
 def computePos(x, y, tw, th, twc, thc):
+    #if x==5 and y==6:
+        #print(np.array([(x * tw) + twc, (y * th) + thc]))
     return np.array([(x * tw) + twc, (y * th) + thc])
 
 class Cell():
