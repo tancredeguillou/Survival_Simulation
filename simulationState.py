@@ -5,8 +5,6 @@ WIDTH = 900
 HEIGHT = 600
 
 def computePos(x, y, tw, th, twc, thc):
-    #if x==5 and y==6:
-        #print(np.array([(x * tw) + twc, (y * th) + thc]))
     return np.array([(x * tw) + twc, (y * th) + thc])
 
 class Cell():
@@ -21,8 +19,8 @@ class Agent():
         self.pos = pos
         self.desired_pos = desired_pos
         self.vel = np.array([0, 0])
+        self.desired_dir = np.array([0, 0])
         self.inventory = inventory
-        #id seems to be artificial here
         self.id = id
 
 
@@ -100,6 +98,8 @@ class State():
                 while newAgent.id != self.agents[i].id:
                     i += 1
                 newAgent.vel = self.agents[i].vel
+                newAgent.pos = self.agents[i].pos
+                newAgent.desired_dir = self.agents[i].desired_dir
         self.agents = newAgents
 
         if self.time == self.max_time:
@@ -121,6 +121,3 @@ class State():
         # This uses the observation that in json }{ cannot occur in a single object
         # Note: so long as no string value containing } whitespace { appears in the json document
         return ''.join(s.split()).replace('}{', '}\n{')
-
-    def count_survivors(self):
-        return sum(1 for agent in self.agents if agent.inventory > 0)

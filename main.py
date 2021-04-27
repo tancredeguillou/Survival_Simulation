@@ -1,4 +1,4 @@
-import sys, pygame, math, time
+import sys, pygame, math, time, random
 import numpy as np
 from simulationState import State
 
@@ -14,8 +14,8 @@ FPS = 60
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
-AGENT_MAX_SPEED = 2
-AGENT_STEER_STRENGTH = 2
+AGENT_MAX_SPEED = 1
+AGENT_STEER_STRENGTH = 10
 AGENTS_WANDER_STRENGTH = 0.5
 AGENT_RADIUS = 6
 
@@ -40,6 +40,15 @@ def message_to_screen(msg, x, y, color=WHITE):
     screen_txt = font.render(msg, False, color)
     SCREEN.blit(screen_txt, [x, y])
 
+def draw_controls():
+    pygame.draw.polygon(SCREEN, WHITE, [(820, 20), (820, 40), (810, 30)])
+    pygame.draw.polygon(SCREEN, WHITE, [(860, 20), (860, 40), (870, 30)])
+    rect = pygame.Rect(833, 20, 5, 20)
+    pygame.draw.rect(SCREEN, WHITE, rect)
+    rect2 = pygame.Rect(842, 20, 5, 20)
+    pygame.draw.rect(SCREEN, WHITE, rect2)
+    
+
 def draw_stats(time, survivors):
     message_to_screen("Day n°: " + str(time), 10, 10)
     message_to_screen("Survivors: " + str(survivors), 10, 25)
@@ -51,6 +60,7 @@ def draw_window(state):
     for agent in state.agents:
         drawAgent(agent, state.max_inventory)
     draw_stats(state.time, len(state.agents))
+    draw_controls()
 
 
 #drawing the cells : we are drawing the water resources on the map
@@ -65,38 +75,46 @@ def drawAgent(agent, max_inventory):
         (colorPercentage(max_inventory - agent.inventory, max_inventory), colorPercentage(agent.inventory, max_inventory), 0),
         agent.pos, AGENT_RADIUS)
 
+def check_pos(pos, dpos, w, h):
+    hdist = math.fabs(pos[0] - dpos[0])
+    vdist = math.fabs(pos[1] - dpos[1])
+    return hdist < w/4 and vdist < h/4
+
+def insideUnitCircle():
+    t = 2 * math.pi * random.random()
+    u = random.random() + random.random()
+    r = u
+    if u > 1:
+        r = 2 - u
+    return np.array([r * math.cos(t), r * math.sin(t)])
+
+def new_pos(agent):
+    desiredVelocity = agent.desired_dir * AGENT_MAX_SPEED
+    desiredSteeringForce = (desiredVelocity - agent.vel) * AGENT_STEER_STRENGTH
+    acceleration = clamp_norm(desiredSteeringForce, AGENT_STEER_STRENGTH) / 1
+
+    agent.vel = clamp_norm(agent.vel + acceleration, AGENT_MAX_SPEED) / 1
+    agent.pos = agent.pos + agent.vel
+
 #updating the states will be done with the logs from the simulation.
 # For visualisation we will for now simulate a very simple behaviour...
 def updateAgent(state):
     for agent in state.agents:
-        #verify that agent can still move in its current direction : he does not hit a border
-        #if (agent.pos + agent.vel).any() > np.array([WIDTH, HEIGHT]).any() or (agent.pos + agent.vel).any() < np.array([0, 0]).any():
-            #if so, the agent goes in opposit direction (as I said it's very simple only to visualise...)
-            #agent.vel = -agent.vel
-        #we now must verify that the agent does not hit a water pit
-        #for cell in state.cells:
-            #computing the distance between water pit's center and agent's center
-            #dist = math.hypot(agent.pos[0]-cell.pos[0], agent.pos[1]-cell.pos[1])
-            #if the distance is lower than the radius, then again change the direction
-            #if dist < pit_radius(cell.water / state.max_water_capacity):
-                #agent.vel[0] = -agent.vel[0]
-                #agent.vel[1] = -agent.vel[1]
-        #finally update the new positions
-        temp = agent.desired_pos - agent.pos
-        desiredDirection = np.array([0, 0])
-        if temp.all() != desiredDirection.all():
-            desiredDirection = temp / np.linalg.norm(temp)
+        if check_pos(agent.pos, agent.desired_pos, state.tile_width, state.tile_height):
+            agent.desired_dir = agent.desired_dir + insideUnitCircle() * AGENTS_WANDER_STRENGTH
+            if agent.desired_dir.all() != np.array([0, 0]).all():
+                agent.desired_dir = agent.desired_dir / np.linalg.norm(agent.desired_dir)
 
-        desiredVelocity = desiredDirection * AGENT_MAX_SPEED
-        desiredSteeringForce = (desiredVelocity - agent.vel) * AGENT_STEER_STRENGTH
-        acceleration = clamp_norm(desiredSteeringForce, AGENT_STEER_STRENGTH) / 1
+            new_pos(agent)
+        else:
+            temp = agent.desired_pos - agent.pos
+            agent.desired_dir = temp / np.linalg.norm(temp)
 
-        agent.vel = clamp_norm(agent.vel + acceleration, AGENT_MAX_SPEED) / 1
-        agent.pos = agent.pos + agent.vel
+            new_pos(agent)
 
-def stats(agent, x, y):
+def stats(agent, x, y, max_inventory):
     message_to_screen("Agent id : " + str(agent.id), agent.pos[0] + x, agent.pos[1] + y)
-    message_to_screen("Water left : " + str(agent.inventory), agent.pos[0] + x, agent.pos[1] + y + 15)
+    message_to_screen("Water left : " + str(math.floor((agent.inventory/max_inventory)*100)) + "%", agent.pos[0] + x, agent.pos[1] + y + 15)
 
 def paused(state) :
 
@@ -118,11 +136,11 @@ def paused(state) :
             #if the distance is lower than the radius, then again change the direction
             if dist < AGENT_RADIUS:
                 if agent.pos[0] > WIDTH - 50:
-                    stats(agent, -90, -30)
+                    stats(agent, -90, -30, state.max_inventory)
                 elif agent.pos[1] < 50:
-                    stats(agent, 15, 13)
+                    stats(agent, 15, 13, state.max_inventory)
                 else:
-                    stats(agent, 15, -30)
+                    stats(agent, 15, -30, state.max_inventory)
         pygame.display.update()
         
 
@@ -142,7 +160,7 @@ def main():
                 if event.key == pygame.K_SPACE:
                     paused(state)
 
-        if iteration == 2:
+        if iteration == 4:
             state.load()
             iteration = 0
         else:
